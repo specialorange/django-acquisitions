@@ -217,3 +217,4 @@ ACQUISITIONS_LEAD_MODEL = 'myapp.Lead'
 ## License
 
 BSD-3-Clause
+
