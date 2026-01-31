@@ -1,0 +1,11 @@
+[default.extend-identifiers]
+
+[default.extend-words]
+
+[files]
+extend-exclude = [
+    "*.lock",
+    "*.min.js",
+    "migrations/",
+    ".venv/",
+]
