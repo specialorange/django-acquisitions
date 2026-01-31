@@ -182,6 +182,63 @@ Available endpoints:
 - `GET/POST /api/acquisitions/campaigns/` - Outreach campaigns
 - `GET/POST /api/acquisitions/documents/` - Marketing documents
 
+## Multi-Tenancy Support
+
+django-acquisitions supports multi-tenancy out of the box with two approaches:
+
+### Schema-per-tenant (django-tenants)
+
+For [django-tenants](https://django-tenants.readthedocs.io/) with PostgreSQL schema isolation:
+
+```python
+# settings.py
+SHARED_APPS = [
+    'django_tenants',
+    'django.contrib.contenttypes',
+    'django.contrib.auth',
+    # ... other shared apps
+]
+
+TENANT_APPS = [
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'acquisitions',  # Include in tenant apps
+    # ... other tenant-specific apps
+]
+
+INSTALLED_APPS = SHARED_APPS + [app for app in TENANT_APPS if app not in SHARED_APPS]
+
+# Leave ACQUISITIONS_TENANT_MODEL unset (defaults to None)
+# Schema isolation handles tenant separation automatically
+```
+
+Run migrations for each tenant as per django-tenants documentation.
+
+### FK-based tenancy (django-organizations style)
+
+For shared-schema multi-tenancy with a foreign key to your tenant/account model:
+
+```python
+# settings.py
+ACQUISITIONS_TENANT_MODEL = 'accounts.Account'  # Your tenant model
+ACQUISITIONS_TENANT_FIELD_NAME = 'account'  # FK field name (default)
+```
+
+Then use the `TenantFilterMixin` in your views:
+
+```python
+from acquisitions.mixins import TenantFilterMixin
+from acquisitions.models import ProspectiveClient
+
+class ProspectiveClientListView(TenantFilterMixin, ListView):
+    model = ProspectiveClient
+
+    def get_queryset(self):
+        return self.filter_by_tenant(super().get_queryset())
+```
+
+The mixin automatically detects tenants from `request.tenant` (django-tenants) or `request.user.account`.
+
 ## Celery Tasks
 
 For automated outreach, add to your Celery beat schedule:
