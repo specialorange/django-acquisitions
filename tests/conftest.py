@@ -5,6 +5,7 @@ Pytest fixtures for django-acquisitions tests.
 import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 
 @pytest.fixture
@@ -176,3 +177,23 @@ def seller_profile_factory(db):
         return SellerProfile.objects.create(**defaults)
 
     return create_profile
+
+
+@pytest.fixture
+def api_client():
+    """Return an API client."""
+    return APIClient()
+
+
+@pytest.fixture
+def authenticated_client(api_client, user):
+    """Return an authenticated API client."""
+    api_client.force_authenticate(user=user)
+    return api_client
+
+
+@pytest.fixture
+def staff_client(api_client, staff_user):
+    """Return an authenticated staff API client."""
+    api_client.force_authenticate(user=staff_user)
+    return api_client

@@ -3,39 +3,15 @@ API tests for django-acquisitions.
 """
 
 import pytest
-from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from acquisitions.models import (
-    Category,
-    Industry,
     MarketingDocument,
     OutreachCampaign,
     ProspectiveClient,
     ProspectiveClientContact,
     Touchpoint,
 )
-
-
-@pytest.fixture
-def api_client():
-    """Return an API client."""
-    return APIClient()
-
-
-@pytest.fixture
-def authenticated_client(api_client, user):
-    """Return an authenticated API client."""
-    api_client.force_authenticate(user=user)
-    return api_client
-
-
-@pytest.fixture
-def staff_client(api_client, staff_user):
-    """Return an authenticated staff API client."""
-    api_client.force_authenticate(user=staff_user)
-    return api_client
 
 
 @pytest.mark.django_db
