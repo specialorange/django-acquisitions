@@ -42,9 +42,9 @@ def get_pipeline_summary():
 
     # Add computed totals
     active_statuses = ["new", "contacted", "qualified", "proposal", "negotiation"]
-    summary["_total"] = sum(summary.values())
-    summary["_active"] = sum(summary.get(s, 0) for s in active_statuses)
-    summary["_closed"] = summary.get("won", 0) + summary.get("lost", 0)
+    summary["total"] = sum(summary.values())
+    summary["active"] = sum(summary.get(s, 0) for s in active_statuses)
+    summary["closed"] = summary.get("won", 0) + summary.get("lost", 0)
 
     return summary
 

@@ -560,3 +560,6 @@ def _patched_get_urls():
 
 
 admin.site.get_urls = _patched_get_urls
+
+# Set custom index template with dashboard banner
+admin.site.index_template = "admin/acquisitions/index_with_dashboard.html"
