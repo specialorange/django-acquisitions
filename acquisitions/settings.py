@@ -93,10 +93,11 @@ class AcquisitionsSettings:
     @property
     def ONBOARDING_CALLBACK(self):
         """
-        Callback function path for lead-to-customer conversion.
+        Callback function path for prospective client to customer conversion.
 
-        Should be a string like 'myapp.services.create_customer_from_lead'
-        The function receives (lead, user) and should return {'success': bool, 'customer_id': ...}
+        Should be a string like 'myapp.services.create_customer_from_prospect'
+        The function receives (prospective_client, user) and should return
+        {'success': bool, 'customer_id': ...}
         """
         return getattr(settings, "ACQUISITIONS_ONBOARDING_CALLBACK", None)
 

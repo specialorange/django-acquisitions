@@ -490,7 +490,7 @@ class CampaignStep(models.Model):
     # Conditions
     skip_if_responded = models.BooleanField(
         default=True,
-        help_text="Skip this step if lead has responded",
+        help_text="Skip this step if prospect has responded",
     )
 
     is_active = models.BooleanField(default=True)

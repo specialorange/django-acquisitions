@@ -28,24 +28,24 @@ Authentication
 All endpoints require authentication. The API uses DRF's standard authentication classes.
 
 
-Prospective Clients (Leads)
----------------------------
+Prospective Clients
+-------------------
 
 List and create prospective clients:
 
-.. code-block:: http
+.. code-block:: text
 
-   GET /api/acquisitions/leads/
-   POST /api/acquisitions/leads/
+   GET /api/acquisitions/prospective-clients/
+   POST /api/acquisitions/prospective-clients/
 
 Retrieve, update, or delete a prospective client:
 
-.. code-block:: http
+.. code-block:: text
 
-   GET /api/acquisitions/leads/{uuid}/
-   PUT /api/acquisitions/leads/{uuid}/
-   PATCH /api/acquisitions/leads/{uuid}/
-   DELETE /api/acquisitions/leads/{uuid}/
+   GET /api/acquisitions/prospective-clients/{uuid}/
+   PUT /api/acquisitions/prospective-clients/{uuid}/
+   PATCH /api/acquisitions/prospective-clients/{uuid}/
+   DELETE /api/acquisitions/prospective-clients/{uuid}/
 
 **Filtering:**
 
@@ -57,16 +57,15 @@ Retrieve, update, or delete a prospective client:
 
 Convert to customer:
 
-.. code-block:: http
+.. code-block:: text
 
-   POST /api/acquisitions/leads/{uuid}/convert/
+   POST /api/acquisitions/prospective-clients/{uuid}/convert/
 
 Enroll in campaign:
 
-.. code-block:: http
+.. code-block:: text
 
-   POST /api/acquisitions/leads/{uuid}/enroll_campaign/
-   Content-Type: application/json
+   POST /api/acquisitions/prospective-clients/{uuid}/enroll_campaign/
 
    {"campaign_uuid": "..."}
 
@@ -76,14 +75,14 @@ Contacts
 
 Nested under prospective clients:
 
-.. code-block:: http
+.. code-block:: text
 
-   GET /api/acquisitions/leads/{uuid}/contacts/
-   POST /api/acquisitions/leads/{uuid}/contacts/
-   GET /api/acquisitions/leads/{uuid}/contacts/{contact_uuid}/
-   PUT /api/acquisitions/leads/{uuid}/contacts/{contact_uuid}/
-   PATCH /api/acquisitions/leads/{uuid}/contacts/{contact_uuid}/
-   DELETE /api/acquisitions/leads/{uuid}/contacts/{contact_uuid}/
+   GET /api/acquisitions/prospective-clients/{uuid}/contacts/
+   POST /api/acquisitions/prospective-clients/{uuid}/contacts/
+   GET /api/acquisitions/prospective-clients/{uuid}/contacts/{contact_uuid}/
+   PUT /api/acquisitions/prospective-clients/{uuid}/contacts/{contact_uuid}/
+   PATCH /api/acquisitions/prospective-clients/{uuid}/contacts/{contact_uuid}/
+   DELETE /api/acquisitions/prospective-clients/{uuid}/contacts/{contact_uuid}/
 
 
 Touchpoints
@@ -91,18 +90,15 @@ Touchpoints
 
 Nested under prospective clients:
 
-.. code-block:: http
+.. code-block:: text
 
-   GET /api/acquisitions/leads/{uuid}/touchpoints/
-   POST /api/acquisitions/leads/{uuid}/touchpoints/
-   GET /api/acquisitions/leads/{uuid}/touchpoints/{touchpoint_uuid}/
+   GET /api/acquisitions/prospective-clients/{uuid}/touchpoints/
+   POST /api/acquisitions/prospective-clients/{uuid}/touchpoints/
+   GET /api/acquisitions/prospective-clients/{uuid}/touchpoints/{touchpoint_uuid}/
 
 **Example: Create a touchpoint**
 
-.. code-block:: http
-
-   POST /api/acquisitions/leads/{uuid}/touchpoints/
-   Content-Type: application/json
+.. code-block:: json
 
    {
        "touchpoint_type": "email",
@@ -112,10 +108,47 @@ Nested under prospective clients:
    }
 
 
+Dashboard
+---------
+
+Team overview and analytics:
+
+.. code-block:: text
+
+   GET /api/acquisitions/dashboard/
+
+Returns full dashboard data including:
+
+- Pipeline summary (counts by status)
+- Stale prospects (no recent contact)
+- Unassigned prospects
+- Seller performance
+- Upcoming outreach
+- Conversion funnel
+- Campaign performance
+
+**Query Parameters:**
+
+- ``?stale_days=14`` - Days without contact to be considered stale
+- ``?activity_days=30`` - Days to look back for activity metrics
+
+**Individual endpoints:**
+
+.. code-block:: text
+
+   GET /api/acquisitions/dashboard/pipeline/
+   GET /api/acquisitions/dashboard/stale/
+   GET /api/acquisitions/dashboard/unassigned/
+   GET /api/acquisitions/dashboard/sellers/
+   GET /api/acquisitions/dashboard/funnel/
+   GET /api/acquisitions/dashboard/campaigns/
+   GET /api/acquisitions/dashboard/activity/
+
+
 Campaigns
 ---------
 
-.. code-block:: http
+.. code-block:: text
 
    GET /api/acquisitions/campaigns/
    POST /api/acquisitions/campaigns/
@@ -146,7 +179,7 @@ Campaign detail includes nested steps:
 Marketing Documents
 -------------------
 
-.. code-block:: http
+.. code-block:: text
 
    GET /api/acquisitions/documents/
    POST /api/acquisitions/documents/
@@ -160,7 +193,7 @@ Marketing Documents
 
 Track views and downloads:
 
-.. code-block:: http
+.. code-block:: text
 
    POST /api/acquisitions/documents/{uuid}/track_view/
    POST /api/acquisitions/documents/{uuid}/track_download/
@@ -175,13 +208,13 @@ Seller Profiles
 
 Get current user's profile:
 
-.. code-block:: http
+.. code-block:: text
 
    GET /api/acquisitions/sellers/me/
 
 List all sellers (requires seller profile or staff):
 
-.. code-block:: http
+.. code-block:: text
 
    GET /api/acquisitions/sellers/
 
@@ -189,7 +222,7 @@ List all sellers (requires seller profile or staff):
 Industries
 ----------
 
-.. code-block:: http
+.. code-block:: text
 
    GET /api/acquisitions/industries/
    POST /api/acquisitions/industries/
@@ -199,7 +232,7 @@ Industries
 Categories
 ----------
 
-.. code-block:: http
+.. code-block:: text
 
    GET /api/acquisitions/categories/
    POST /api/acquisitions/categories/

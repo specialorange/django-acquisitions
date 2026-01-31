@@ -149,13 +149,13 @@ try:
         serializer_class = ProspectiveClientContactSerializer
 
         def get_queryset(self):
-            prospective_client_uuid = self.kwargs.get("lead_uuid")  # Keep URL param name for backwards compat
+            prospective_client_uuid = self.kwargs.get("prospective_client_uuid")
             if prospective_client_uuid:
                 return ProspectiveClientContact.objects.filter(prospective_client__uuid=prospective_client_uuid)
             return ProspectiveClientContact.objects.none()
 
         def perform_create(self, serializer):
-            prospective_client_uuid = self.kwargs.get("lead_uuid")
+            prospective_client_uuid = self.kwargs.get("prospective_client_uuid")
             prospective_client = ProspectiveClient.objects.get(uuid=prospective_client_uuid)
             serializer.save(prospective_client=prospective_client)
 
@@ -166,13 +166,13 @@ try:
         serializer_class = TouchpointSerializer
 
         def get_queryset(self):
-            prospective_client_uuid = self.kwargs.get("lead_uuid")  # Keep URL param name for backwards compat
+            prospective_client_uuid = self.kwargs.get("prospective_client_uuid")
             if prospective_client_uuid:
                 return Touchpoint.objects.filter(prospective_client__uuid=prospective_client_uuid)
             return Touchpoint.objects.all()
 
         def perform_create(self, serializer):
-            prospective_client_uuid = self.kwargs.get("lead_uuid")
+            prospective_client_uuid = self.kwargs.get("prospective_client_uuid")
             if prospective_client_uuid:
                 prospective_client = ProspectiveClient.objects.get(uuid=prospective_client_uuid)
                 serializer.save(
@@ -244,6 +244,118 @@ try:
                 return Response(
                     {"error": "No seller profile found"}, status=status.HTTP_404_NOT_FOUND
                 )
+
+    class DashboardViewSet(viewsets.ViewSet):
+        """
+        ViewSet for team dashboard and analytics.
+
+        Provides aggregated data about prospective clients, stale contacts,
+        seller performance, and pipeline health.
+        """
+
+        permission_classes = [IsAuthenticated]
+
+        def list(self, request):
+            """Get full dashboard data."""
+            from ..services.dashboard import get_full_dashboard
+
+            stale_days = int(request.query_params.get("stale_days", 14))
+            activity_days = int(request.query_params.get("activity_days", 30))
+
+            data = get_full_dashboard(
+                stale_days=stale_days,
+                activity_days=activity_days,
+            )
+            return Response(data)
+
+        @action(detail=False, methods=["get"])
+        def pipeline(self, request):
+            """Get pipeline summary only."""
+            from ..services.dashboard import get_pipeline_summary
+
+            return Response(get_pipeline_summary())
+
+        @action(detail=False, methods=["get"])
+        def stale(self, request):
+            """Get stale prospects."""
+            from ..services.dashboard import get_stale_prospects
+            from django.utils import timezone
+
+            days = int(request.query_params.get("days", 14))
+            limit = int(request.query_params.get("limit", 50))
+
+            stale = get_stale_prospects(days=days, limit=limit)
+
+            return Response([
+                {
+                    "id": p.id,
+                    "uuid": str(p.uuid),
+                    "company_name": p.company_name,
+                    "status": p.status,
+                    "priority": p.priority,
+                    "score": p.score,
+                    "assigned_to_id": p.assigned_to_id,
+                    "last_touchpoint": p.last_touchpoint,
+                    "touchpoint_count": p.touchpoint_count,
+                    "days_since_contact": (
+                        (timezone.now() - p.last_touchpoint).days
+                        if p.last_touchpoint else None
+                    ),
+                }
+                for p in stale
+            ])
+
+        @action(detail=False, methods=["get"])
+        def unassigned(self, request):
+            """Get unassigned prospects."""
+            from ..services.dashboard import get_unassigned_prospects
+
+            limit = int(request.query_params.get("limit", 50))
+            unassigned = get_unassigned_prospects(limit=limit)
+
+            return Response([
+                {
+                    "id": p.id,
+                    "uuid": str(p.uuid),
+                    "company_name": p.company_name,
+                    "status": p.status,
+                    "priority": p.priority,
+                    "score": p.score,
+                    "created_at": p.created_at,
+                }
+                for p in unassigned
+            ])
+
+        @action(detail=False, methods=["get"])
+        def sellers(self, request):
+            """Get seller performance."""
+            from ..services.dashboard import get_seller_performance
+
+            days = int(request.query_params.get("days", 30))
+            return Response(get_seller_performance(days=days))
+
+        @action(detail=False, methods=["get"])
+        def funnel(self, request):
+            """Get conversion funnel."""
+            from ..services.dashboard import get_conversion_funnel
+
+            days = int(request.query_params.get("days", 30))
+            return Response(get_conversion_funnel(days=days))
+
+        @action(detail=False, methods=["get"])
+        def campaigns(self, request):
+            """Get campaign performance."""
+            from ..services.dashboard import get_campaign_performance
+
+            return Response(get_campaign_performance())
+
+        @action(detail=False, methods=["get"])
+        def activity(self, request):
+            """Get activity by day for charting."""
+            from ..services.dashboard import get_activity_by_day
+
+            days = int(request.query_params.get("days", 30))
+            return Response(get_activity_by_day(days=days))
 
 except ImportError:
     # DRF not installed

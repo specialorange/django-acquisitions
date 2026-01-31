@@ -9,28 +9,30 @@ try:
     from rest_framework.routers import DefaultRouter
 
     from .viewsets import (
-        LeadContactViewSet,
-        LeadViewSet,
+        DashboardViewSet,
         MarketingDocumentViewSet,
         OutreachCampaignViewSet,
+        ProspectiveClientContactViewSet,
+        ProspectiveClientViewSet,
         SellerProfileViewSet,
         TouchpointViewSet,
     )
 
     router = DefaultRouter()
-    router.register(r"leads", LeadViewSet, basename="lead")
+    router.register(r"prospective-clients", ProspectiveClientViewSet, basename="prospective-client")
     router.register(r"campaigns", OutreachCampaignViewSet, basename="campaign")
     router.register(r"documents", MarketingDocumentViewSet, basename="document")
     router.register(r"sellers", SellerProfileViewSet, basename="seller")
+    router.register(r"dashboard", DashboardViewSet, basename="dashboard")
 
-    # Nested routes for lead contacts and touchpoints
-    lead_contacts_list = LeadContactViewSet.as_view({"get": "list", "post": "create"})
-    lead_contacts_detail = LeadContactViewSet.as_view(
+    # Nested routes for prospective client contacts and touchpoints
+    contacts_list = ProspectiveClientContactViewSet.as_view({"get": "list", "post": "create"})
+    contacts_detail = ProspectiveClientContactViewSet.as_view(
         {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
     )
 
-    lead_touchpoints_list = TouchpointViewSet.as_view({"get": "list", "post": "create"})
-    lead_touchpoints_detail = TouchpointViewSet.as_view(
+    touchpoints_list = TouchpointViewSet.as_view({"get": "list", "post": "create"})
+    touchpoints_detail = TouchpointViewSet.as_view(
         {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
     )
 
@@ -38,24 +40,24 @@ try:
         path("", include(router.urls)),
         # Nested routes
         path(
-            "leads/<uuid:lead_uuid>/contacts/",
-            lead_contacts_list,
-            name="lead-contacts-list",
+            "prospective-clients/<uuid:prospective_client_uuid>/contacts/",
+            contacts_list,
+            name="prospective-client-contacts-list",
         ),
         path(
-            "leads/<uuid:lead_uuid>/contacts/<uuid:uuid>/",
-            lead_contacts_detail,
-            name="lead-contacts-detail",
+            "prospective-clients/<uuid:prospective_client_uuid>/contacts/<uuid:uuid>/",
+            contacts_detail,
+            name="prospective-client-contacts-detail",
         ),
         path(
-            "leads/<uuid:lead_uuid>/touchpoints/",
-            lead_touchpoints_list,
-            name="lead-touchpoints-list",
+            "prospective-clients/<uuid:prospective_client_uuid>/touchpoints/",
+            touchpoints_list,
+            name="prospective-client-touchpoints-list",
         ),
         path(
-            "leads/<uuid:lead_uuid>/touchpoints/<uuid:uuid>/",
-            lead_touchpoints_detail,
-            name="lead-touchpoints-detail",
+            "prospective-clients/<uuid:prospective_client_uuid>/touchpoints/<uuid:uuid>/",
+            touchpoints_detail,
+            name="prospective-client-touchpoints-detail",
         ),
     ]
 

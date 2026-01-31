@@ -24,7 +24,7 @@ try:
     )
     def send_campaign_step_task(self, enrollment_id: int) -> dict:
         """
-        Execute a campaign step for an enrolled lead.
+        Execute a campaign step for an enrolled prospective_client.
 
         Args:
             enrollment_id: CampaignEnrollment ID
@@ -36,7 +36,7 @@ try:
         from ..services.outreach import execute_campaign_step
 
         try:
-            enrollment = CampaignEnrollment.objects.select_related("lead", "campaign").get(
+            enrollment = CampaignEnrollment.objects.select_related("prospective_client", "campaign").get(
                 id=enrollment_id
             )
         except CampaignEnrollment.DoesNotExist:
@@ -84,7 +84,7 @@ except ImportError:
         from ..services.outreach import execute_campaign_step
 
         try:
-            enrollment = CampaignEnrollment.objects.select_related("lead", "campaign").get(
+            enrollment = CampaignEnrollment.objects.select_related("prospective_client", "campaign").get(
                 id=enrollment_id
             )
         except CampaignEnrollment.DoesNotExist:

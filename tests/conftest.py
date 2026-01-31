@@ -78,24 +78,10 @@ def prospective_client_factory(db):
     return create_prospective_client
 
 
-# Backwards compatibility alias
-@pytest.fixture
-def lead_factory(prospective_client_factory):
-    """Factory for creating test leads (alias for prospective_client_factory)."""
-    return prospective_client_factory
-
-
 @pytest.fixture
 def prospective_client(prospective_client_factory):
     """Create a single test prospective client."""
     return prospective_client_factory()
-
-
-# Backwards compatibility alias
-@pytest.fixture
-def lead(prospective_client):
-    """Create a single test lead (alias for prospective_client)."""
-    return prospective_client
 
 
 @pytest.fixture

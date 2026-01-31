@@ -337,23 +337,3 @@ class TestSellerProfile:
         assert profile.get_working_days_list() == [1, 3, 5]
 
 
-# Test backwards compatibility aliases
-@pytest.mark.django_db
-class TestBackwardsCompatibility:
-    """Tests for backwards compatibility aliases."""
-
-    def test_lead_alias(self, prospective_client_factory):
-        """Test Lead is an alias for ProspectiveClient."""
-        from acquisitions.models import Lead
-
-        pc = prospective_client_factory(company_name="Test")
-        assert isinstance(pc, Lead)
-        assert Lead is ProspectiveClient
-
-    def test_lead_contact_alias(self, prospective_client, contact_factory):
-        """Test LeadContact is an alias for ProspectiveClientContact."""
-        from acquisitions.models import LeadContact
-
-        contact = contact_factory(prospective_client, first_name="Test")
-        assert isinstance(contact, LeadContact)
-        assert LeadContact is ProspectiveClientContact

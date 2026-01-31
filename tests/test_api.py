@@ -44,7 +44,7 @@ class TestProspectiveClientAPI:
 
     def test_list_prospective_clients_unauthenticated(self, api_client):
         """Test unauthenticated users cannot list prospective clients."""
-        response = api_client.get("/api/acquisitions/leads/")
+        response = api_client.get("/api/acquisitions/prospective-clients/")
         # DRF returns 403 for unauthenticated requests by default
         assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
 
@@ -53,7 +53,7 @@ class TestProspectiveClientAPI:
         prospective_client_factory(company_name="Company A")
         prospective_client_factory(company_name="Company B")
 
-        response = authenticated_client.get("/api/acquisitions/leads/")
+        response = authenticated_client.get("/api/acquisitions/prospective-clients/")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 2
 
@@ -64,7 +64,7 @@ class TestProspectiveClientAPI:
             "status": "new",
             "source": "website",
         }
-        response = authenticated_client.post("/api/acquisitions/leads/", data)
+        response = authenticated_client.post("/api/acquisitions/prospective-clients/", data)
         assert response.status_code == status.HTTP_201_CREATED
         assert ProspectiveClient.objects.filter(company_name="New Company").exists()
 
@@ -72,7 +72,7 @@ class TestProspectiveClientAPI:
         """Test retrieving a single prospective client."""
         pc = prospective_client_factory(company_name="Test Company")
 
-        response = authenticated_client.get(f"/api/acquisitions/leads/{pc.uuid}/")
+        response = authenticated_client.get(f"/api/acquisitions/prospective-clients/{pc.uuid}/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["company_name"] == "Test Company"
 
@@ -81,7 +81,7 @@ class TestProspectiveClientAPI:
         pc = prospective_client_factory(company_name="Old Name")
 
         response = authenticated_client.patch(
-            f"/api/acquisitions/leads/{pc.uuid}/",
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/",
             {"company_name": "New Name"},
         )
         assert response.status_code == status.HTTP_200_OK
@@ -94,7 +94,7 @@ class TestProspectiveClientAPI:
         pc = prospective_client_factory()
         pc_uuid = pc.uuid
 
-        response = authenticated_client.delete(f"/api/acquisitions/leads/{pc_uuid}/")
+        response = authenticated_client.delete(f"/api/acquisitions/prospective-clients/{pc_uuid}/")
         assert response.status_code == status.HTTP_204_NO_CONTENT
         assert not ProspectiveClient.objects.filter(uuid=pc_uuid).exists()
 
@@ -103,7 +103,7 @@ class TestProspectiveClientAPI:
         prospective_client_factory(company_name="New PC", status=ProspectiveClient.Status.NEW)
         prospective_client_factory(company_name="Contacted PC", status=ProspectiveClient.Status.CONTACTED)
 
-        response = authenticated_client.get("/api/acquisitions/leads/?status=new")
+        response = authenticated_client.get("/api/acquisitions/prospective-clients/?status=new")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1
         assert response.data[0]["company_name"] == "New PC"
@@ -113,7 +113,7 @@ class TestProspectiveClientAPI:
         prospective_client_factory(company_name="My PC", assigned_to_id=user.id)
         prospective_client_factory(company_name="Other PC", assigned_to_id=999)
 
-        response = authenticated_client.get("/api/acquisitions/leads/?assigned_to=me")
+        response = authenticated_client.get("/api/acquisitions/prospective-clients/?assigned_to=me")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1
         assert response.data[0]["company_name"] == "My PC"
@@ -123,7 +123,7 @@ class TestProspectiveClientAPI:
         prospective_client_factory(company_name="Acme Corporation")
         prospective_client_factory(company_name="Beta Industries")
 
-        response = authenticated_client.get("/api/acquisitions/leads/?search=Acme")
+        response = authenticated_client.get("/api/acquisitions/prospective-clients/?search=Acme")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 1
         assert response.data[0]["company_name"] == "Acme Corporation"
@@ -132,7 +132,7 @@ class TestProspectiveClientAPI:
         """Test converting a prospective client to customer."""
         pc = prospective_client_factory(status=ProspectiveClient.Status.QUALIFIED)
 
-        response = authenticated_client.post(f"/api/acquisitions/leads/{pc.uuid}/convert/")
+        response = authenticated_client.post(f"/api/acquisitions/prospective-clients/{pc.uuid}/convert/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["success"] is True
 
@@ -144,7 +144,7 @@ class TestProspectiveClientAPI:
         """Test converting an already converted prospective client fails."""
         pc = prospective_client_factory(status=ProspectiveClient.Status.WON)
 
-        response = authenticated_client.post(f"/api/acquisitions/leads/{pc.uuid}/convert/")
+        response = authenticated_client.post(f"/api/acquisitions/prospective-clients/{pc.uuid}/convert/")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_enroll_prospective_client_in_campaign(self, authenticated_client, prospective_client_factory, campaign):
@@ -152,7 +152,7 @@ class TestProspectiveClientAPI:
         pc = prospective_client_factory()
 
         response = authenticated_client.post(
-            f"/api/acquisitions/leads/{pc.uuid}/enroll_campaign/",
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/enroll_campaign/",
             {"campaign_uuid": str(campaign.uuid)},
         )
         assert response.status_code == status.HTTP_200_OK
@@ -163,7 +163,7 @@ class TestProspectiveClientAPI:
         pc = prospective_client_factory()
 
         response = authenticated_client.post(
-            f"/api/acquisitions/leads/{pc.uuid}/enroll_campaign/",
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/enroll_campaign/",
             {},
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -173,7 +173,7 @@ class TestProspectiveClientAPI:
         industry = industry_factory(name="Technology")
         pc = prospective_client_factory(company_name="Tech Co", industry=industry)
 
-        response = authenticated_client.get(f"/api/acquisitions/leads/{pc.uuid}/")
+        response = authenticated_client.get(f"/api/acquisitions/prospective-clients/{pc.uuid}/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["industry"] == industry.id
         assert response.data["industry_detail"]["name"] == "Technology"
@@ -190,7 +190,7 @@ class TestProspectiveClientContactAPI:
         contact_factory(pc, first_name="Jane")
 
         response = authenticated_client.get(
-            f"/api/acquisitions/leads/{pc.uuid}/contacts/"
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/contacts/"
         )
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 2
@@ -206,7 +206,7 @@ class TestProspectiveClientContactAPI:
             "is_primary": True,
         }
         response = authenticated_client.post(
-            f"/api/acquisitions/leads/{pc.uuid}/contacts/",
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/contacts/",
             data,
         )
         assert response.status_code == status.HTTP_201_CREATED
@@ -218,7 +218,7 @@ class TestProspectiveClientContactAPI:
         contact = contact_factory(pc, first_name="John")
 
         response = authenticated_client.patch(
-            f"/api/acquisitions/leads/{pc.uuid}/contacts/{contact.uuid}/",
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/contacts/{contact.uuid}/",
             {"first_name": "Jonathan"},
         )
         assert response.status_code == status.HTTP_200_OK
@@ -238,7 +238,7 @@ class TestTouchpointAPI:
         touchpoint_factory(pc)
 
         response = authenticated_client.get(
-            f"/api/acquisitions/leads/{pc.uuid}/touchpoints/"
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/touchpoints/"
         )
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) == 2
@@ -254,7 +254,7 @@ class TestTouchpointAPI:
             "occurred_at": "2024-01-15T10:00:00Z",
         }
         response = authenticated_client.post(
-            f"/api/acquisitions/leads/{pc.uuid}/touchpoints/",
+            f"/api/acquisitions/prospective-clients/{pc.uuid}/touchpoints/",
             data,
         )
         assert response.status_code == status.HTTP_201_CREATED

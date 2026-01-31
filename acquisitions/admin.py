@@ -3,6 +3,9 @@ Django admin configuration for customer acquisition models.
 """
 
 from django.contrib import admin
+from django.template.response import TemplateResponse
+from django.urls import path
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import (
@@ -424,3 +427,136 @@ class SellerProfileAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     ]
+
+
+class AcquisitionsAdminSite(admin.AdminSite):
+    """Custom admin site with dashboard."""
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "acquisitions/dashboard/",
+                self.admin_view(self.dashboard_view),
+                name="acquisitions_dashboard",
+            ),
+        ]
+        return custom_urls + urls
+
+    def dashboard_view(self, request):
+        """Team dashboard view."""
+        from .services.dashboard import (
+            get_campaign_performance,
+            get_conversion_funnel,
+            get_pipeline_summary,
+            get_seller_performance,
+            get_stale_prospects,
+            get_unassigned_prospects,
+            get_upcoming_outreach,
+        )
+
+        stale_days = int(request.GET.get("stale_days", 14))
+        activity_days = int(request.GET.get("activity_days", 30))
+
+        # Get stale prospects with annotated data
+        stale_qs = get_stale_prospects(days=stale_days, limit=20)
+        stale_prospects = []
+        for pc in stale_qs:
+            pc.days_since_contact = (
+                (timezone.now() - pc.last_touchpoint).days
+                if pc.last_touchpoint else None
+            )
+            stale_prospects.append(pc)
+
+        context = {
+            **self.each_context(request),
+            "title": "Acquisitions Dashboard",
+            "pipeline": get_pipeline_summary(),
+            "stale_prospects": stale_prospects,
+            "unassigned_prospects": get_unassigned_prospects(limit=20),
+            "seller_performance": get_seller_performance(days=activity_days),
+            "upcoming_outreach": get_upcoming_outreach(limit=20),
+            "funnel": get_conversion_funnel(days=activity_days),
+            "campaign_performance": get_campaign_performance(),
+            "stale_days": stale_days,
+            "activity_days": activity_days,
+            "generated_at": timezone.now(),
+        }
+
+        return TemplateResponse(
+            request,
+            "admin/acquisitions/dashboard.html",
+            context,
+        )
+
+
+# Add dashboard URL to the default admin site
+def get_admin_urls(urls):
+    """Add dashboard URL to admin."""
+    from django.urls import path
+
+    def dashboard_view(request):
+        """Team dashboard view."""
+        from .services.dashboard import (
+            get_campaign_performance,
+            get_conversion_funnel,
+            get_pipeline_summary,
+            get_seller_performance,
+            get_stale_prospects,
+            get_unassigned_prospects,
+            get_upcoming_outreach,
+        )
+
+        stale_days = int(request.GET.get("stale_days", 14))
+        activity_days = int(request.GET.get("activity_days", 30))
+
+        # Get stale prospects with annotated data
+        stale_qs = get_stale_prospects(days=stale_days, limit=20)
+        stale_prospects = []
+        for pc in stale_qs:
+            pc.days_since_contact = (
+                (timezone.now() - pc.last_touchpoint).days
+                if pc.last_touchpoint else None
+            )
+            stale_prospects.append(pc)
+
+        context = {
+            **admin.site.each_context(request),
+            "title": "Acquisitions Dashboard",
+            "pipeline": get_pipeline_summary(),
+            "stale_prospects": stale_prospects,
+            "unassigned_prospects": get_unassigned_prospects(limit=20),
+            "seller_performance": get_seller_performance(days=activity_days),
+            "upcoming_outreach": get_upcoming_outreach(limit=20),
+            "funnel": get_conversion_funnel(days=activity_days),
+            "campaign_performance": get_campaign_performance(),
+            "stale_days": stale_days,
+            "activity_days": activity_days,
+            "generated_at": timezone.now(),
+        }
+
+        return TemplateResponse(
+            request,
+            "admin/acquisitions/dashboard.html",
+            context,
+        )
+
+    custom_urls = [
+        path(
+            "acquisitions/dashboard/",
+            admin.site.admin_view(dashboard_view),
+            name="acquisitions_dashboard",
+        ),
+    ]
+    return custom_urls + urls
+
+
+# Monkey-patch admin.site.get_urls to include dashboard
+_original_get_urls = admin.site.get_urls
+
+
+def _patched_get_urls():
+    return get_admin_urls(_original_get_urls())
+
+
+admin.site.get_urls = _patched_get_urls

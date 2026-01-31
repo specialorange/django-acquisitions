@@ -17,7 +17,7 @@ class TenantFilterMixin:
 
     Usage in views:
         class MyView(TenantFilterMixin, ListView):
-            model = Lead
+            model = ProspectiveClient
 
             def get_queryset(self):
                 return self.filter_by_tenant(super().get_queryset())
@@ -57,8 +57,8 @@ class AssignedToMixin:
     Mixin for filtering by assigned user.
 
     Usage in views:
-        class MyLeadView(AssignedToMixin, ListView):
-            model = Lead
+        class MyProspectView(AssignedToMixin, ListView):
+            model = ProspectiveClient
 
             def get_queryset(self):
                 return self.filter_by_assignment(super().get_queryset())
