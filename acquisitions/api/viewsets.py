@@ -11,21 +11,21 @@ try:
     from rest_framework.response import Response
 
     from ..models import (
-        Lead,
-        LeadContact,
         MarketingDocument,
         OutreachCampaign,
+        ProspectiveClient,
+        ProspectiveClientContact,
         SellerProfile,
         Touchpoint,
     )
-    from .permissions import HasLeadPermission, IsSellerOrAdmin, ReadOnlyOrAdmin
+    from .permissions import HasProspectiveClientPermission, IsSellerOrAdmin, ReadOnlyOrAdmin
     from .serializers import (
-        LeadContactSerializer,
-        LeadCreateSerializer,
-        LeadDetailSerializer,
-        LeadListSerializer,
         MarketingDocumentSerializer,
         OutreachCampaignSerializer,
+        ProspectiveClientContactSerializer,
+        ProspectiveClientCreateSerializer,
+        ProspectiveClientDetailSerializer,
+        ProspectiveClientListSerializer,
         SellerProfileSerializer,
         TouchpointSerializer,
     )
@@ -44,30 +44,30 @@ try:
         def get_serializer_class(self):
             return self.serializer_classes.get(self.action, self.serializer_class)
 
-    class LeadViewSet(UUIDLookupMixin, MultiSerializerMixin, viewsets.ModelViewSet):
+    class ProspectiveClientViewSet(UUIDLookupMixin, MultiSerializerMixin, viewsets.ModelViewSet):
         """
-        ViewSet for Lead CRUD operations.
+        ViewSet for ProspectiveClient CRUD operations.
 
-        list: List all leads (with filtering)
-        retrieve: Get lead details
-        create: Create new lead
-        update: Update lead
-        destroy: Delete lead
+        list: List all prospective clients (with filtering)
+        retrieve: Get prospective client details
+        create: Create new prospective client
+        update: Update prospective client
+        destroy: Delete prospective client
         """
 
-        permission_classes = [IsAuthenticated, HasLeadPermission]
-        serializer_class = LeadListSerializer
+        permission_classes = [IsAuthenticated, HasProspectiveClientPermission]
+        serializer_class = ProspectiveClientListSerializer
         serializer_classes = {
-            "list": LeadListSerializer,
-            "retrieve": LeadDetailSerializer,
-            "create": LeadCreateSerializer,
-            "update": LeadDetailSerializer,
-            "partial_update": LeadDetailSerializer,
+            "list": ProspectiveClientListSerializer,
+            "retrieve": ProspectiveClientDetailSerializer,
+            "create": ProspectiveClientCreateSerializer,
+            "update": ProspectiveClientDetailSerializer,
+            "partial_update": ProspectiveClientDetailSerializer,
         }
 
         def get_queryset(self):
             """Filter queryset based on query params."""
-            qs = Lead.objects.all()
+            qs = ProspectiveClient.objects.all()
 
             # Filter by status
             status_filter = self.request.query_params.get("status")
@@ -95,18 +95,18 @@ try:
 
         @action(detail=True, methods=["post"])
         def convert(self, request, uuid=None):
-            """Convert a lead to a customer."""
-            lead = self.get_object()
+            """Convert a prospective client to a customer."""
+            prospective_client = self.get_object()
 
-            from ..services.onboarding import convert_lead
+            from ..services.onboarding import convert_prospective_client
 
-            result = convert_lead(lead, request.user)
+            result = convert_prospective_client(prospective_client, request.user)
 
             if result["success"]:
                 return Response(
                     {
                         "success": True,
-                        "lead_uuid": str(lead.uuid),
+                        "prospective_client_uuid": str(prospective_client.uuid),
                         "customer_id": result.get("customer_id"),
                     }
                 )
@@ -115,8 +115,8 @@ try:
 
         @action(detail=True, methods=["post"])
         def enroll_campaign(self, request, uuid=None):
-            """Enroll lead in an outreach campaign."""
-            lead = self.get_object()
+            """Enroll prospective client in an outreach campaign."""
+            prospective_client = self.get_object()
             campaign_uuid = request.data.get("campaign_uuid")
 
             if not campaign_uuid:
@@ -129,10 +129,10 @@ try:
             except OutreachCampaign.DoesNotExist:
                 return Response({"error": "Campaign not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            from ..services.outreach import enroll_lead_in_campaign
+            from ..services.outreach import enroll_prospective_client_in_campaign
 
             try:
-                enrollment = enroll_lead_in_campaign(lead, campaign)
+                enrollment = enroll_prospective_client_in_campaign(prospective_client, campaign)
                 return Response(
                     {
                         "success": True,
@@ -142,22 +142,22 @@ try:
             except ValueError as e:
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    class LeadContactViewSet(UUIDLookupMixin, viewsets.ModelViewSet):
-        """ViewSet for LeadContact CRUD."""
+    class ProspectiveClientContactViewSet(UUIDLookupMixin, viewsets.ModelViewSet):
+        """ViewSet for ProspectiveClientContact CRUD."""
 
         permission_classes = [IsAuthenticated]
-        serializer_class = LeadContactSerializer
+        serializer_class = ProspectiveClientContactSerializer
 
         def get_queryset(self):
-            lead_uuid = self.kwargs.get("lead_uuid")
-            if lead_uuid:
-                return LeadContact.objects.filter(lead__uuid=lead_uuid)
-            return LeadContact.objects.none()
+            prospective_client_uuid = self.kwargs.get("lead_uuid")  # Keep URL param name for backwards compat
+            if prospective_client_uuid:
+                return ProspectiveClientContact.objects.filter(prospective_client__uuid=prospective_client_uuid)
+            return ProspectiveClientContact.objects.none()
 
         def perform_create(self, serializer):
-            lead_uuid = self.kwargs.get("lead_uuid")
-            lead = Lead.objects.get(uuid=lead_uuid)
-            serializer.save(lead=lead)
+            prospective_client_uuid = self.kwargs.get("lead_uuid")
+            prospective_client = ProspectiveClient.objects.get(uuid=prospective_client_uuid)
+            serializer.save(prospective_client=prospective_client)
 
     class TouchpointViewSet(UUIDLookupMixin, viewsets.ModelViewSet):
         """ViewSet for Touchpoint CRUD."""
@@ -166,17 +166,17 @@ try:
         serializer_class = TouchpointSerializer
 
         def get_queryset(self):
-            lead_uuid = self.kwargs.get("lead_uuid")
-            if lead_uuid:
-                return Touchpoint.objects.filter(lead__uuid=lead_uuid)
+            prospective_client_uuid = self.kwargs.get("lead_uuid")  # Keep URL param name for backwards compat
+            if prospective_client_uuid:
+                return Touchpoint.objects.filter(prospective_client__uuid=prospective_client_uuid)
             return Touchpoint.objects.all()
 
         def perform_create(self, serializer):
-            lead_uuid = self.kwargs.get("lead_uuid")
-            if lead_uuid:
-                lead = Lead.objects.get(uuid=lead_uuid)
+            prospective_client_uuid = self.kwargs.get("lead_uuid")
+            if prospective_client_uuid:
+                prospective_client = ProspectiveClient.objects.get(uuid=prospective_client_uuid)
                 serializer.save(
-                    lead=lead,
+                    prospective_client=prospective_client,
                     performed_by_id=self.request.user.id,
                 )
             else:

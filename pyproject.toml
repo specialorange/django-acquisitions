@@ -34,11 +34,16 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/specialorange/django-acquisitions"
 Repository = "https://github.com/specialorange/django-acquisitions"
+Documentation = "https://django-acquisitions.readthedocs.io"
 
 [project.optional-dependencies]
 celery = ["celery>=5.0"]
 twilio = ["twilio>=8.0"]
 drf = ["djangorestframework>=3.14"]
+docs = [
+    "sphinx>=7.0",
+    "furo>=2024.0",
+]
 all = [
     "celery>=5.0",
     "twilio>=8.0",
@@ -76,3 +81,29 @@ ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["acquisitions"]
+
+[tool.coverage.run]
+source = ["acquisitions"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+show_missing = true
+skip_covered = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"

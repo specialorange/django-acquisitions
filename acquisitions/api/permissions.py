@@ -7,9 +7,9 @@ Requires: pip install django-acquisitions[drf]
 try:
     from rest_framework.permissions import BasePermission, IsAuthenticated
 
-    class HasLeadPermission(BasePermission):
+    class HasProspectiveClientPermission(BasePermission):
         """
-        Permission class for lead access.
+        Permission class for prospective client access.
 
         Override this in your project for custom permission logic.
         """
@@ -18,7 +18,7 @@ try:
             return request.user and request.user.is_authenticated
 
         def has_object_permission(self, request, view, obj):
-            # By default, authenticated users can access all leads
+            # By default, authenticated users can access all prospective clients
             # Override for tenant/organization filtering
             return True
 

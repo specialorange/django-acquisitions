@@ -5,11 +5,11 @@ Service tests for django-acquisitions.
 import pytest
 from django.utils import timezone
 
-from acquisitions.models import CampaignEnrollment, CampaignStep, Lead, Touchpoint
+from acquisitions.models import CampaignEnrollment, CampaignStep, ProspectiveClient, Touchpoint
 from acquisitions.services.communication import render_template, send_email, send_sms
-from acquisitions.services.onboarding import convert_lead, prepare_onboarding_data
+from acquisitions.services.onboarding import convert_prospective_client, prepare_onboarding_data
 from acquisitions.services.outreach import (
-    enroll_lead_in_campaign,
+    enroll_prospective_client_in_campaign,
     execute_campaign_step,
     process_scheduled_outreach,
 )
@@ -25,33 +25,34 @@ class TestCommunicationService:
         result = render_template(template, {"name": "John", "company": "Acme"})
         assert result == "Hello John, welcome to Acme!"
 
-    def test_send_email(self, lead):
+    def test_send_email(self, prospective_client, contact_factory):
         """Test sending email."""
+        contact = contact_factory(prospective_client, email="test@example.com")
         result = send_email(
-            to=lead.email,
+            to=contact.email,
             subject="Test Subject",
             body_text="Test body",
         )
         # Should succeed with locmem backend
         assert result.success is True
 
-    def test_send_email_with_template(self, lead):
+    def test_send_email_with_template(self, prospective_client, contact_factory):
         """Test sending email with template."""
+        contact = contact_factory(prospective_client, email="test@example.com")
         result = send_email(
-            to=lead.email,
+            to=contact.email,
             subject="Hello {{ company_name }}",
             body_text="Welcome to our service, {{ company_name }}!",
-            context={"company_name": lead.company_name},
+            context={"company_name": prospective_client.company_name},
         )
         assert result.success is True
 
-    def test_send_sms(self, lead):
+    def test_send_sms(self, prospective_client, contact_factory):
         """Test sending SMS (console backend)."""
-        lead.phone = "5551234567"
-        lead.save()
+        contact = contact_factory(prospective_client, phone="5551234567")
 
         result = send_sms(
-            to=lead.phone,
+            to=contact.phone,
             body="Test SMS message",
         )
         # Console backend always succeeds
@@ -62,33 +63,33 @@ class TestCommunicationService:
 class TestOnboardingService:
     """Tests for onboarding service."""
 
-    def test_convert_lead(self, lead, user):
-        """Test lead conversion."""
-        result = convert_lead(lead, user)
+    def test_convert_prospective_client(self, prospective_client, user):
+        """Test prospective client conversion."""
+        result = convert_prospective_client(prospective_client, user)
 
         assert result["success"] is True
-        assert result["lead_id"] == lead.id
+        assert result["prospective_client_id"] == prospective_client.id
 
-        lead.refresh_from_db()
-        assert lead.status == Lead.Status.WON
-        assert lead.converted_at is not None
+        prospective_client.refresh_from_db()
+        assert prospective_client.status == ProspectiveClient.Status.WON
+        assert prospective_client.converted_at is not None
 
-    def test_convert_already_converted(self, lead_factory, user):
-        """Test converting already converted lead."""
-        lead = lead_factory(status=Lead.Status.WON)
+    def test_convert_already_converted(self, prospective_client_factory, user):
+        """Test converting already converted prospective client."""
+        pc = prospective_client_factory(status=ProspectiveClient.Status.WON)
 
-        result = convert_lead(lead, user)
+        result = convert_prospective_client(pc, user)
         assert result["success"] is False
         assert "already converted" in result["error"].lower()
 
-    def test_prepare_onboarding_data(self, lead, contact_factory):
+    def test_prepare_onboarding_data(self, prospective_client, contact_factory):
         """Test preparing onboarding data."""
-        contact = contact_factory(lead, is_primary=True)
+        contact = contact_factory(prospective_client, is_primary=True, email="primary@example.com")
 
-        data = prepare_onboarding_data(lead)
+        data = prepare_onboarding_data(prospective_client)
 
-        assert data["company"]["name"] == lead.company_name
-        assert data["primary_email"] == lead.email
+        assert data["company"]["name"] == prospective_client.company_name
+        assert data["primary_email"] == contact.email
         assert data["primary_contact"]["first_name"] == contact.first_name
         assert len(data["contacts"]) == 1
 
@@ -97,33 +98,35 @@ class TestOnboardingService:
 class TestOutreachService:
     """Tests for outreach service."""
 
-    def test_enroll_lead_in_campaign(self, lead, campaign, campaign_step_factory):
-        """Test enrolling a lead in a campaign."""
+    def test_enroll_prospective_client_in_campaign(self, prospective_client, campaign, campaign_step_factory):
+        """Test enrolling a prospective client in a campaign."""
         campaign_step_factory(campaign, step_order=0)
 
-        enrollment = enroll_lead_in_campaign(lead, campaign)
+        enrollment = enroll_prospective_client_in_campaign(prospective_client, campaign)
 
-        assert enrollment.lead == lead
+        assert enrollment.prospective_client == prospective_client
         assert enrollment.campaign == campaign
         assert enrollment.is_active is True
         assert enrollment.next_step_scheduled_at is not None
 
-    def test_enroll_already_enrolled(self, lead, campaign):
-        """Test enrolling already enrolled lead."""
-        CampaignEnrollment.objects.create(lead=lead, campaign=campaign, is_active=True)
+    def test_enroll_already_enrolled(self, prospective_client, campaign):
+        """Test enrolling already enrolled prospective client."""
+        CampaignEnrollment.objects.create(
+            prospective_client=prospective_client, campaign=campaign, is_active=True
+        )
 
         with pytest.raises(ValueError):
-            enroll_lead_in_campaign(lead, campaign)
+            enroll_prospective_client_in_campaign(prospective_client, campaign)
 
     def test_execute_campaign_step_email(
-        self, lead, campaign, campaign_step_factory, contact_factory
+        self, prospective_client, campaign, campaign_step_factory, contact_factory
     ):
         """Test executing an email campaign step."""
-        contact_factory(lead, is_primary=True)
+        contact_factory(prospective_client, is_primary=True)
         step = campaign_step_factory(campaign, step_order=0, step_type=CampaignStep.StepType.EMAIL)
 
         enrollment = CampaignEnrollment.objects.create(
-            lead=lead,
+            prospective_client=prospective_client,
             campaign=campaign,
             current_step=0,
         )
@@ -134,28 +137,28 @@ class TestOutreachService:
 
         # Check touchpoint was created
         assert Touchpoint.objects.filter(
-            lead=lead,
+            prospective_client=prospective_client,
             touchpoint_type=Touchpoint.TouchpointType.EMAIL,
             is_automated=True,
         ).exists()
 
     def test_execute_campaign_step_skip_responded(
-        self, lead, campaign, campaign_step_factory, touchpoint_factory
+        self, prospective_client, campaign, campaign_step_factory, touchpoint_factory
     ):
-        """Test skipping step when lead has responded."""
+        """Test skipping step when prospective client has responded."""
         step = campaign_step_factory(
             campaign, step_order=0, step_type=CampaignStep.StepType.EMAIL, skip_if_responded=True
         )
 
         enrollment = CampaignEnrollment.objects.create(
-            lead=lead,
+            prospective_client=prospective_client,
             campaign=campaign,
             current_step=0,
         )
 
         # Create inbound touchpoint after enrollment
         touchpoint_factory(
-            lead,
+            prospective_client,
             direction=Touchpoint.Direction.INBOUND,
             occurred_at=timezone.now(),
         )
@@ -164,18 +167,18 @@ class TestOutreachService:
 
         assert result["success"] is True
         assert result.get("skipped") is True
-        assert result.get("reason") == "lead_responded"
+        assert result.get("reason") == "prospective_client_responded"
 
     def test_process_scheduled_outreach(
-        self, lead, campaign, campaign_step_factory, contact_factory
+        self, prospective_client, campaign, campaign_step_factory, contact_factory
     ):
         """Test processing scheduled outreach."""
-        contact_factory(lead, is_primary=True)
+        contact_factory(prospective_client, is_primary=True)
         campaign_step_factory(campaign, step_order=0)
 
         # Create enrollment due for processing
         enrollment = CampaignEnrollment.objects.create(
-            lead=lead,
+            prospective_client=prospective_client,
             campaign=campaign,
             current_step=0,
             next_step_scheduled_at=timezone.now() - timezone.timedelta(hours=1),

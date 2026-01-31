@@ -10,19 +10,28 @@ try:
     from ..models import (
         CampaignEnrollment,
         CampaignStep,
-        Lead,
-        LeadContact,
+        Industry,
         MarketingDocument,
         OutreachCampaign,
+        ProspectiveClient,
+        ProspectiveClientContact,
         SellerProfile,
         Touchpoint,
     )
 
-    class LeadContactSerializer(serializers.ModelSerializer):
-        """Serializer for LeadContact."""
+    class IndustrySerializer(serializers.ModelSerializer):
+        """Serializer for Industry."""
 
         class Meta:
-            model = LeadContact
+            model = Industry
+            fields = ["id", "name", "description", "is_active"]
+            read_only_fields = ["id"]
+
+    class ProspectiveClientContactSerializer(serializers.ModelSerializer):
+        """Serializer for ProspectiveClientContact."""
+
+        class Meta:
+            model = ProspectiveClientContact
             fields = [
                 "uuid",
                 "first_name",
@@ -50,7 +59,7 @@ try:
         contact_uuid = serializers.SlugRelatedField(
             source="contact",
             slug_field="uuid",
-            queryset=LeadContact.objects.all(),
+            queryset=ProspectiveClientContact.objects.all(),
             required=False,
             allow_null=True,
         )
@@ -75,22 +84,22 @@ try:
             ]
             read_only_fields = ["uuid", "created_at", "updated_at", "is_automated", "external_id"]
 
-    class LeadListSerializer(serializers.ModelSerializer):
-        """Serializer for Lead list view."""
+    class ProspectiveClientListSerializer(serializers.ModelSerializer):
+        """Serializer for ProspectiveClient list view."""
 
         contact_count = serializers.IntegerField(source="contacts.count", read_only=True)
         touchpoint_count = serializers.IntegerField(source="touchpoints.count", read_only=True)
+        industry_name = serializers.CharField(source="industry.name", read_only=True)
 
         class Meta:
-            model = Lead
+            model = ProspectiveClient
             fields = [
                 "uuid",
                 "company_name",
                 "industry",
+                "industry_name",
                 "status",
                 "source",
-                "email",
-                "phone",
                 "city",
                 "state",
                 "score",
@@ -104,23 +113,23 @@ try:
             ]
             read_only_fields = ["uuid", "created_at", "updated_at"]
 
-    class LeadDetailSerializer(serializers.ModelSerializer):
-        """Serializer for Lead detail view."""
+    class ProspectiveClientDetailSerializer(serializers.ModelSerializer):
+        """Serializer for ProspectiveClient detail view."""
 
-        contacts = LeadContactSerializer(many=True, read_only=True)
+        contacts = ProspectiveClientContactSerializer(many=True, read_only=True)
         recent_touchpoints = serializers.SerializerMethodField()
+        industry_detail = IndustrySerializer(source="industry", read_only=True)
 
         class Meta:
-            model = Lead
+            model = ProspectiveClient
             fields = [
                 "uuid",
                 "company_name",
                 "industry",
+                "industry_detail",
                 "website",
                 "status",
                 "source",
-                "email",
-                "phone",
                 "address_line1",
                 "address_line2",
                 "city",
@@ -145,19 +154,17 @@ try:
             touchpoints = obj.touchpoints.all()[:10]
             return TouchpointSerializer(touchpoints, many=True).data
 
-    class LeadCreateSerializer(serializers.ModelSerializer):
-        """Serializer for creating a Lead."""
+    class ProspectiveClientCreateSerializer(serializers.ModelSerializer):
+        """Serializer for creating a ProspectiveClient."""
 
         class Meta:
-            model = Lead
+            model = ProspectiveClient
             fields = [
                 "company_name",
                 "industry",
                 "website",
                 "status",
                 "source",
-                "email",
-                "phone",
                 "address_line1",
                 "address_line2",
                 "city",
@@ -215,8 +222,8 @@ try:
     class CampaignEnrollmentSerializer(serializers.ModelSerializer):
         """Serializer for CampaignEnrollment."""
 
-        lead_uuid = serializers.SlugRelatedField(
-            source="lead",
+        prospective_client_uuid = serializers.SlugRelatedField(
+            source="prospective_client",
             slug_field="uuid",
             read_only=True,
         )
@@ -230,7 +237,7 @@ try:
             model = CampaignEnrollment
             fields = [
                 "id",
-                "lead_uuid",
+                "prospective_client_uuid",
                 "campaign_uuid",
                 "current_step",
                 "next_step_scheduled_at",
@@ -274,22 +281,22 @@ try:
                 "email",
                 "phone",
                 "email_signature",
-                "auto_assign_leads",
-                "max_active_leads",
+                "auto_assign_prospective_clients",
+                "max_active_prospective_clients",
                 "working_hours_start",
                 "working_hours_end",
                 "working_days",
                 "timezone",
-                "total_leads_converted",
-                "active_leads_count",
+                "total_converted",
+                "active_prospective_clients_count",
                 "is_active",
                 "created_at",
                 "updated_at",
             ]
             read_only_fields = [
                 "uuid",
-                "total_leads_converted",
-                "active_leads_count",
+                "total_converted",
+                "active_prospective_clients_count",
                 "created_at",
                 "updated_at",
             ]

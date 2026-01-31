@@ -1,5 +1,10 @@
 # django-acquisitions
 
+[![Tests](https://github.com/specialorange/django-acquisitions/actions/workflows/tests.yml/badge.svg)](https://github.com/specialorange/django-acquisitions/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/specialorange/django-acquisitions/graph/badge.svg)](https://codecov.io/gh/specialorange/django-acquisitions)
+[![Documentation Status](https://readthedocs.org/projects/django-acquisitions/badge/?version=latest)](https://django-acquisitions.readthedocs.io/en/latest/)
+[![PyPI version](https://badge.fury.io/py/django-acquisitions.svg)](https://pypi.org/project/django-acquisitions/)
+
 A minimal Django 4+ package for customer acquisition pipeline management. Track leads, manage contacts, automate outreach campaigns, and handle customer onboarding.
 
 ## Features

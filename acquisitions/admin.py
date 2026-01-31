@@ -8,19 +8,47 @@ from django.utils.html import format_html
 from .models import (
     CampaignEnrollment,
     CampaignStep,
-    Lead,
-    LeadContact,
+    Category,
+    Industry,
     MarketingDocument,
     OutreachCampaign,
+    ProspectiveClient,
+    ProspectiveClientContact,
     SellerProfile,
     Touchpoint,
 )
 
 
-class LeadContactInline(admin.TabularInline):
-    """Inline for LeadContact within Lead admin."""
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    """Admin for Category model."""
 
-    model = LeadContact
+    list_display = ["name", "color", "is_active", "prospective_client_count"]
+    list_filter = ["is_active"]
+    search_fields = ["name", "description"]
+
+    @admin.display(description="Prospective Clients")
+    def prospective_client_count(self, obj):
+        return obj.prospective_clients.count()
+
+
+@admin.register(Industry)
+class IndustryAdmin(admin.ModelAdmin):
+    """Admin for Industry model."""
+
+    list_display = ["name", "is_active", "prospective_client_count"]
+    list_filter = ["is_active"]
+    search_fields = ["name", "description"]
+
+    @admin.display(description="Prospective Clients")
+    def prospective_client_count(self, obj):
+        return obj.prospective_clients.count()
+
+
+class ProspectiveClientContactInline(admin.TabularInline):
+    """Inline for ProspectiveClientContact within ProspectiveClient admin."""
+
+    model = ProspectiveClientContact
     extra = 1
     fields = [
         "first_name",
@@ -34,11 +62,12 @@ class LeadContactInline(admin.TabularInline):
 
 
 class TouchpointInline(admin.TabularInline):
-    """Inline for recent Touchpoints within Lead admin."""
+    """Inline for recent Touchpoints within ProspectiveClient admin."""
 
     model = Touchpoint
     extra = 0
     max_num = 5
+    fk_name = "prospective_client"
     fields = [
         "touchpoint_type",
         "direction",
@@ -54,15 +83,15 @@ class TouchpointInline(admin.TabularInline):
         return False
 
 
-@admin.register(Lead)
-class LeadAdmin(admin.ModelAdmin):
-    """Admin for Lead model."""
+@admin.register(ProspectiveClient)
+class ProspectiveClientAdmin(admin.ModelAdmin):
+    """Admin for ProspectiveClient model."""
 
     list_display = [
         "company_name",
         "status_badge",
         "source",
-        "email",
+        "industry",
         "city",
         "state",
         "score",
@@ -73,14 +102,15 @@ class LeadAdmin(admin.ModelAdmin):
     list_filter = [
         "status",
         "source",
+        "industry",
+        "categories",
         "priority",
         "state",
         "created_at",
     ]
+    filter_horizontal = ["categories"]
     search_fields = [
         "company_name",
-        "email",
-        "phone",
         "city",
         "contacts__first_name",
         "contacts__last_name",
@@ -94,7 +124,7 @@ class LeadAdmin(admin.ModelAdmin):
     ]
     list_editable = ["priority"]
     date_hierarchy = "created_at"
-    inlines = [LeadContactInline, TouchpointInline]
+    inlines = [ProspectiveClientContactInline, TouchpointInline]
 
     fieldsets = (
         (
@@ -103,6 +133,7 @@ class LeadAdmin(admin.ModelAdmin):
                 "fields": (
                     "company_name",
                     "industry",
+                    "categories",
                     "website",
                 )
             },
@@ -116,15 +147,6 @@ class LeadAdmin(admin.ModelAdmin):
                     "score",
                     "priority",
                     "estimated_value",
-                )
-            },
-        ),
-        (
-            "Contact",
-            {
-                "fields": (
-                    "email",
-                    "phone",
                 )
             },
         ),
@@ -201,26 +223,26 @@ class LeadAdmin(admin.ModelAdmin):
     def contact_count(self, obj):
         return obj.contacts.count()
 
-    @admin.action(description="Mark selected leads as Contacted")
+    @admin.action(description="Mark selected as Contacted")
     def mark_as_contacted(self, request, queryset):
-        queryset.update(status=Lead.Status.CONTACTED)
+        queryset.update(status=ProspectiveClient.Status.CONTACTED)
 
-    @admin.action(description="Mark selected leads as Qualified")
+    @admin.action(description="Mark selected as Qualified")
     def mark_as_qualified(self, request, queryset):
-        queryset.update(status=Lead.Status.QUALIFIED)
+        queryset.update(status=ProspectiveClient.Status.QUALIFIED)
 
-    @admin.action(description="Mark selected leads as Lost")
+    @admin.action(description="Mark selected as Lost")
     def mark_as_lost(self, request, queryset):
-        queryset.update(status=Lead.Status.LOST)
+        queryset.update(status=ProspectiveClient.Status.LOST)
 
 
-@admin.register(LeadContact)
-class LeadContactAdmin(admin.ModelAdmin):
-    """Admin for LeadContact model."""
+@admin.register(ProspectiveClientContact)
+class ProspectiveClientContactAdmin(admin.ModelAdmin):
+    """Admin for ProspectiveClientContact model."""
 
     list_display = [
         "full_name",
-        "lead",
+        "prospective_client",
         "title",
         "role",
         "email",
@@ -238,9 +260,9 @@ class LeadContactAdmin(admin.ModelAdmin):
         "first_name",
         "last_name",
         "email",
-        "lead__company_name",
+        "prospective_client__company_name",
     ]
-    raw_id_fields = ["lead"]
+    raw_id_fields = ["prospective_client"]
     readonly_fields = ["uuid", "created_at", "updated_at"]
 
 
@@ -249,7 +271,7 @@ class TouchpointAdmin(admin.ModelAdmin):
     """Admin for Touchpoint model."""
 
     list_display = [
-        "lead",
+        "prospective_client",
         "touchpoint_type",
         "direction",
         "outcome",
@@ -265,11 +287,11 @@ class TouchpointAdmin(admin.ModelAdmin):
         "occurred_at",
     ]
     search_fields = [
-        "lead__company_name",
+        "prospective_client__company_name",
         "subject",
         "notes",
     ]
-    raw_id_fields = ["lead", "contact", "campaign"]
+    raw_id_fields = ["prospective_client", "contact", "campaign"]
     readonly_fields = ["uuid", "created_at", "updated_at"]
     date_hierarchy = "occurred_at"
 
@@ -326,7 +348,7 @@ class CampaignEnrollmentAdmin(admin.ModelAdmin):
     """Admin for CampaignEnrollment model."""
 
     list_display = [
-        "lead",
+        "prospective_client",
         "campaign",
         "current_step",
         "next_step_scheduled_at",
@@ -339,10 +361,10 @@ class CampaignEnrollmentAdmin(admin.ModelAdmin):
         "enrolled_at",
     ]
     search_fields = [
-        "lead__company_name",
+        "prospective_client__company_name",
         "campaign__name",
     ]
-    raw_id_fields = ["lead", "campaign"]
+    raw_id_fields = ["prospective_client", "campaign"]
     readonly_fields = ["enrolled_at", "updated_at"]
 
 
@@ -384,21 +406,21 @@ class SellerProfileAdmin(admin.ModelAdmin):
         "display_name",
         "email",
         "user_id",
-        "auto_assign_leads",
-        "active_leads_count",
-        "total_leads_converted",
+        "auto_assign_prospective_clients",
+        "active_prospective_clients_count",
+        "total_converted",
         "is_active",
     ]
     list_filter = [
         "is_active",
-        "auto_assign_leads",
+        "auto_assign_prospective_clients",
         "timezone",
     ]
     search_fields = ["display_name", "email"]
     readonly_fields = [
         "uuid",
-        "total_leads_converted",
-        "active_leads_count",
+        "total_converted",
+        "active_prospective_clients_count",
         "created_at",
         "updated_at",
     ]

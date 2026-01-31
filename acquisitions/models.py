@@ -12,9 +12,46 @@ from django.db import models
 from django.utils import timezone
 
 
-class Lead(models.Model):
+class Category(models.Model):
+    """Category tags for prospective clients (M2M)."""
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    color = models.CharField(
+        max_length=7,
+        default="#6b7280",
+        help_text="Hex color code for UI display",
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Industry(models.Model):
+    """Industry classification for prospective clients."""
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Industry"
+        verbose_name_plural = "Industries"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ProspectiveClient(models.Model):
     """
-    A potential customer (prospect/lead) in the acquisition pipeline.
+    A prospective client in the acquisition pipeline.
 
     This is the core model - represents companies/individuals you're trying to acquire.
     """
@@ -43,7 +80,18 @@ class Lead(models.Model):
 
     # Basic Information
     company_name = models.CharField(max_length=200)
-    industry = models.CharField(max_length=100, blank=True)
+    industry = models.ForeignKey(
+        Industry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prospective_clients",
+    )
+    categories = models.ManyToManyField(
+        Category,
+        blank=True,
+        related_name="prospective_clients",
+    )
     website = models.URLField(blank=True)
 
     # Status and Pipeline
@@ -59,10 +107,6 @@ class Lead(models.Model):
         default=Source.OTHER,
     )
 
-    # Contact Information (primary)
-    email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=20, blank=True)
-
     # Address
     address_line1 = models.CharField(max_length=255, blank=True)
     address_line2 = models.CharField(max_length=255, blank=True)
@@ -74,7 +118,7 @@ class Lead(models.Model):
     # Scoring and Priority
     score = models.PositiveIntegerField(
         default=0,
-        help_text="Lead score (higher = more qualified)",
+        help_text="Score (higher = more qualified)",
     )
     priority = models.PositiveIntegerField(
         default=5,
@@ -112,7 +156,7 @@ class Lead(models.Model):
     # Sample data flag
     is_sample = models.BooleanField(
         default=False,
-        help_text="Sample lead created during setup",
+        help_text="Sample prospective client created during setup",
     )
 
     # Timestamps
@@ -125,24 +169,24 @@ class Lead(models.Model):
             models.Index(fields=["status", "priority"]),
             models.Index(fields=["assigned_to_id", "status"]),
         ]
-        verbose_name = "Lead"
-        verbose_name_plural = "Leads"
+        verbose_name = "Prospective Client"
+        verbose_name_plural = "Prospective Clients"
 
     def __str__(self):
         return self.company_name
 
     @property
     def is_active(self):
-        """Check if lead is in an active pipeline stage."""
+        """Check if prospective client is in an active pipeline stage."""
         return self.status not in [self.Status.WON, self.Status.LOST, self.Status.DORMANT]
 
     @property
     def is_converted(self):
-        """Check if lead has been converted to a customer."""
+        """Check if prospective client has been converted to a customer."""
         return self.status == self.Status.WON and self.converted_at is not None
 
     def mark_converted(self, customer_id=None):
-        """Mark this lead as converted to a customer."""
+        """Mark this prospective client as converted to a customer."""
         self.status = self.Status.WON
         self.converted_at = timezone.now()
         if customer_id:
@@ -150,11 +194,11 @@ class Lead(models.Model):
         self.save(update_fields=["status", "converted_at", "converted_to_id", "updated_at"])
 
 
-class LeadContact(models.Model):
+class ProspectiveClientContact(models.Model):
     """
-    Contact person associated with a lead.
+    Contact person associated with a prospective client.
 
-    Multiple contacts per lead/company - tracks decision makers, influencers, etc.
+    Multiple contacts per prospective client/company - tracks decision makers, influencers, etc.
     """
 
     class Role(models.TextChoices):
@@ -168,9 +212,9 @@ class LeadContact(models.Model):
     # UUID for external references
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
 
-    # Foreign key to Lead
-    lead = models.ForeignKey(
-        Lead,
+    # Foreign key to ProspectiveClient
+    prospective_client = models.ForeignKey(
+        ProspectiveClient,
         on_delete=models.CASCADE,
         related_name="contacts",
     )
@@ -212,8 +256,8 @@ class LeadContact(models.Model):
 
     class Meta:
         ordering = ["-is_primary", "last_name", "first_name"]
-        verbose_name = "Lead Contact"
-        verbose_name_plural = "Lead Contacts"
+        verbose_name = "Prospective Client Contact"
+        verbose_name_plural = "Prospective Client Contacts"
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
@@ -223,17 +267,17 @@ class LeadContact(models.Model):
         return f"{self.first_name} {self.last_name}".strip()
 
     def save(self, *args, **kwargs):
-        # If this contact is primary, unset other primary contacts for this lead
-        if self.is_primary and self.lead_id:
-            LeadContact.objects.filter(lead_id=self.lead_id, is_primary=True).exclude(
-                pk=self.pk
-            ).update(is_primary=False)
+        # If this contact is primary, unset other primary contacts for this prospective client
+        if self.is_primary and self.prospective_client_id:
+            ProspectiveClientContact.objects.filter(
+                prospective_client_id=self.prospective_client_id, is_primary=True
+            ).exclude(pk=self.pk).update(is_primary=False)
         super().save(*args, **kwargs)
 
 
 class Touchpoint(models.Model):
     """
-    Record of outreach/interaction with a lead.
+    Record of outreach/interaction with a prospective client.
 
     Tracks all communications: calls, emails, meetings, etc.
     """
@@ -264,9 +308,9 @@ class Touchpoint(models.Model):
     # UUID for external references
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
 
-    # Foreign key to Lead
-    lead = models.ForeignKey(
-        Lead,
+    # Foreign key to ProspectiveClient
+    prospective_client = models.ForeignKey(
+        ProspectiveClient,
         on_delete=models.CASCADE,
         related_name="touchpoints",
     )
@@ -289,7 +333,7 @@ class Touchpoint(models.Model):
 
     # Optional contact reference
     contact = models.ForeignKey(
-        LeadContact,
+        ProspectiveClientContact,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -344,7 +388,7 @@ class Touchpoint(models.Model):
         ordering = ["-occurred_at"]
         indexes = [
             models.Index(fields=["touchpoint_type", "occurred_at"]),
-            models.Index(fields=["lead", "occurred_at"]),
+            models.Index(fields=["prospective_client", "occurred_at"]),
         ]
         verbose_name = "Touchpoint"
         verbose_name_plural = "Touchpoints"
@@ -471,10 +515,10 @@ class CampaignStep(models.Model):
 
 
 class CampaignEnrollment(models.Model):
-    """Tracks which leads are enrolled in which campaigns."""
+    """Tracks which prospective clients are enrolled in which campaigns."""
 
-    lead = models.ForeignKey(
-        Lead,
+    prospective_client = models.ForeignKey(
+        ProspectiveClient,
         on_delete=models.CASCADE,
         related_name="campaign_enrollments",
     )
@@ -497,13 +541,13 @@ class CampaignEnrollment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = [["lead", "campaign"]]
+        unique_together = [["prospective_client", "campaign"]]
         ordering = ["-enrolled_at"]
         verbose_name = "Campaign Enrollment"
         verbose_name_plural = "Campaign Enrollments"
 
     def __str__(self):
-        return f"{self.lead} in {self.campaign}"
+        return f"{self.prospective_client} in {self.campaign}"
 
 
 class MarketingDocument(models.Model):
@@ -613,13 +657,13 @@ class SellerProfile(models.Model):
     )
 
     # Automation preferences
-    auto_assign_leads = models.BooleanField(
+    auto_assign_prospective_clients = models.BooleanField(
         default=False,
-        help_text="Automatically assign new leads to this seller",
+        help_text="Automatically assign new prospective clients to this seller",
     )
-    max_active_leads = models.PositiveIntegerField(
+    max_active_prospective_clients = models.PositiveIntegerField(
         default=50,
-        help_text="Maximum leads in active pipeline",
+        help_text="Maximum prospective clients in active pipeline",
     )
 
     # Working hours (for scheduling outreach)
@@ -633,8 +677,8 @@ class SellerProfile(models.Model):
     timezone = models.CharField(max_length=50, default="America/New_York")
 
     # Stats (denormalized for dashboard)
-    total_leads_converted = models.PositiveIntegerField(default=0)
-    active_leads_count = models.PositiveIntegerField(default=0)
+    total_converted = models.PositiveIntegerField(default=0)
+    active_prospective_clients_count = models.PositiveIntegerField(default=0)
 
     is_active = models.BooleanField(default=True)
 

@@ -9,40 +9,43 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from ..models import CampaignEnrollment, CampaignStep, Lead, OutreachCampaign, Touchpoint
+from ..models import CampaignEnrollment, CampaignStep, OutreachCampaign, ProspectiveClient, Touchpoint
 from ..settings import acquisitions_settings
 from .communication import send_email, send_sms
 
 logger = logging.getLogger(__name__)
 
 
-def enroll_lead_in_campaign(lead: Lead, campaign: OutreachCampaign) -> CampaignEnrollment:
+def enroll_prospective_client_in_campaign(
+    prospective_client: ProspectiveClient,
+    campaign: OutreachCampaign,
+) -> CampaignEnrollment:
     """
-    Enroll a lead in an outreach campaign.
+    Enroll a prospective client in an outreach campaign.
 
     Args:
-        lead: The lead to enroll
+        prospective_client: The prospective client to enroll
         campaign: The campaign to enroll in
 
     Returns:
         CampaignEnrollment instance
 
     Raises:
-        ValueError if lead is already actively enrolled
+        ValueError if prospective client is already actively enrolled
     """
     # Check for existing active enrollment
     existing = CampaignEnrollment.objects.filter(
-        lead=lead,
+        prospective_client=prospective_client,
         campaign=campaign,
         is_active=True,
     ).first()
 
     if existing:
-        raise ValueError(f"Lead {lead.id} is already enrolled in campaign {campaign.id}")
+        raise ValueError(f"Prospective client {prospective_client.id} is already enrolled in campaign {campaign.id}")
 
     # Create enrollment
     enrollment = CampaignEnrollment.objects.create(
-        lead=lead,
+        prospective_client=prospective_client,
         campaign=campaign,
         current_step=0,
         is_active=True,
@@ -55,7 +58,7 @@ def enroll_lead_in_campaign(lead: Lead, campaign: OutreachCampaign) -> CampaignE
         enrollment.next_step_scheduled_at = timezone.now() + delay
         enrollment.save(update_fields=["next_step_scheduled_at"])
 
-    logger.info(f"Lead {lead.id} enrolled in campaign {campaign.id}")
+    logger.info(f"Prospective client {prospective_client.id} enrolled in campaign {campaign.id}")
     return enrollment
 
 
@@ -85,18 +88,18 @@ def execute_campaign_step(enrollment: CampaignEnrollment) -> dict:
         enrollment.save()
         return {"success": True, "completed": True}
 
-    lead = enrollment.lead
+    prospective_client = enrollment.prospective_client
 
     # Check skip conditions
     if step.skip_if_responded:
-        has_inbound = lead.touchpoints.filter(
+        has_inbound = prospective_client.touchpoints.filter(
             direction="inbound",
             occurred_at__gt=enrollment.enrolled_at,
         ).exists()
         if has_inbound:
-            logger.info(f"Skipping step for lead {lead.id} - has responded")
+            logger.info(f"Skipping step for prospective client {prospective_client.id} - has responded")
             _advance_enrollment(enrollment)
-            return {"success": True, "skipped": True, "reason": "lead_responded"}
+            return {"success": True, "skipped": True, "reason": "prospective_client_responded"}
 
     # Execute based on step type
     result = {"success": False}
@@ -141,14 +144,17 @@ def _advance_enrollment(enrollment: CampaignEnrollment):
 
 def _execute_email_step(enrollment: CampaignEnrollment, step: CampaignStep) -> dict:
     """Execute an email campaign step."""
-    lead = enrollment.lead
+    prospective_client = enrollment.prospective_client
 
-    # Get primary contact or use lead email
-    contact = lead.contacts.filter(is_primary=True).first()
-    to_email = contact.email if contact and contact.email else lead.email
+    # Get primary contact
+    contact = prospective_client.contacts.filter(is_primary=True).first()
+    if not contact:
+        contact = prospective_client.contacts.first()
 
-    if not to_email:
-        return {"success": False, "error": "No email address"}
+    if not contact or not contact.email:
+        return {"success": False, "error": "No contact with email address"}
+
+    to_email = contact.email
 
     # Check opt-out
     if contact and contact.opted_out_email:
@@ -156,9 +162,9 @@ def _execute_email_step(enrollment: CampaignEnrollment, step: CampaignStep) -> d
 
     # Build context for template rendering
     context = {
-        "lead": lead,
+        "prospective_client": prospective_client,
         "contact": contact,
-        "company_name": lead.company_name,
+        "company_name": prospective_client.company_name,
         "first_name": contact.first_name if contact else "",
         "last_name": contact.last_name if contact else "",
     }
@@ -173,7 +179,7 @@ def _execute_email_step(enrollment: CampaignEnrollment, step: CampaignStep) -> d
     if result.success:
         # Create touchpoint record
         Touchpoint.objects.create(
-            lead=lead,
+            prospective_client=prospective_client,
             touchpoint_type=Touchpoint.TouchpointType.EMAIL,
             direction=Touchpoint.Direction.OUTBOUND,
             contact=contact,
@@ -190,17 +196,17 @@ def _execute_email_step(enrollment: CampaignEnrollment, step: CampaignStep) -> d
 
 def _execute_sms_step(enrollment: CampaignEnrollment, step: CampaignStep) -> dict:
     """Execute an SMS campaign step."""
-    lead = enrollment.lead
+    prospective_client = enrollment.prospective_client
 
-    # Get primary contact or use lead phone
-    contact = lead.contacts.filter(is_primary=True).first()
-    to_phone = None
+    # Get primary contact
+    contact = prospective_client.contacts.filter(is_primary=True).first()
+    if not contact:
+        contact = prospective_client.contacts.first()
 
-    if contact:
-        to_phone = contact.phone_mobile or contact.phone
-    if not to_phone:
-        to_phone = lead.phone
+    if not contact:
+        return {"success": False, "error": "No contact"}
 
+    to_phone = contact.phone_mobile or contact.phone
     if not to_phone:
         return {"success": False, "error": "No phone number"}
 
@@ -210,9 +216,9 @@ def _execute_sms_step(enrollment: CampaignEnrollment, step: CampaignStep) -> dic
 
     # Build context
     context = {
-        "lead": lead,
+        "prospective_client": prospective_client,
         "contact": contact,
-        "company_name": lead.company_name,
+        "company_name": prospective_client.company_name,
         "first_name": contact.first_name if contact else "",
     }
 
@@ -225,7 +231,7 @@ def _execute_sms_step(enrollment: CampaignEnrollment, step: CampaignStep) -> dic
     if result.success:
         # Create touchpoint record
         Touchpoint.objects.create(
-            lead=lead,
+            prospective_client=prospective_client,
             touchpoint_type=Touchpoint.TouchpointType.SMS,
             direction=Touchpoint.Direction.OUTBOUND,
             contact=contact,
@@ -245,11 +251,11 @@ def _execute_task_step(enrollment: CampaignEnrollment, step: CampaignStep) -> di
 
     Creates a touchpoint as a reminder that manual action is needed.
     """
-    lead = enrollment.lead
+    prospective_client = enrollment.prospective_client
 
     # Create a touchpoint as a task reminder
     Touchpoint.objects.create(
-        lead=lead,
+        prospective_client=prospective_client,
         touchpoint_type=Touchpoint.TouchpointType.OTHER,
         direction=Touchpoint.Direction.OUTBOUND,
         subject=f"Task: {step.subject_template}" if step.subject_template else "Manual Task",
@@ -269,7 +275,7 @@ def get_due_enrollments():
     return CampaignEnrollment.objects.filter(
         is_active=True,
         next_step_scheduled_at__lte=now,
-    ).select_related("lead", "campaign")
+    ).select_related("prospective_client", "campaign")
 
 
 def process_scheduled_outreach() -> dict:

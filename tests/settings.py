@@ -11,8 +11,11 @@ DEBUG = True
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "rest_framework",
     "acquisitions",
 ]
+
+ROOT_URLCONF = "tests.urls"
 
 DATABASES = {
     "default": {
@@ -25,6 +28,15 @@ USE_TZ = True
 TIME_ZONE = "UTC"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {},
+    },
+]
 
 # Acquisitions settings for testing
 ACQUISITIONS_USE_CELERY = False  # Disable Celery in tests

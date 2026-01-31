@@ -1,7 +1,7 @@
 """
-Onboarding service for converting leads to customers.
+Onboarding service for converting prospective clients to customers.
 
-Handles the handoff from lead to customer, with support for
+Handles the handoff from prospective client to customer, with support for
 custom callbacks to integrate with the consuming project's
 customer/account models.
 """
@@ -23,15 +23,15 @@ def _load_callback(callback_path: str):
     return getattr(module, func_name)
 
 
-def convert_lead(lead, user=None) -> dict:
+def convert_prospective_client(prospective_client, user=None) -> dict:
     """
-    Convert a lead to a customer.
+    Convert a prospective client to a customer.
 
-    This marks the lead as won and optionally calls a project-specific
+    This marks the prospective client as won and optionally calls a project-specific
     callback to create the customer record.
 
     Args:
-        lead: The Lead instance to convert
+        prospective_client: The ProspectiveClient instance to convert
         user: The user performing the conversion (optional)
 
     Returns:
@@ -40,13 +40,13 @@ def convert_lead(lead, user=None) -> dict:
             - customer_id: ID of created customer (if callback provided)
             - error: Error message (if failed)
     """
-    from ..models import Lead
+    from ..models import ProspectiveClient
 
     # Check if already converted
-    if lead.status == Lead.Status.WON:
+    if prospective_client.status == ProspectiveClient.Status.WON:
         return {
             "success": False,
-            "error": "Lead is already converted",
+            "error": "Prospective client is already converted",
         }
 
     # Get the onboarding callback if configured
@@ -56,7 +56,7 @@ def convert_lead(lead, user=None) -> dict:
     if callback_path:
         try:
             callback = _load_callback(callback_path)
-            result = callback(lead, user)
+            result = callback(prospective_client, user)
 
             if not result.get("success"):
                 return {
@@ -67,66 +67,66 @@ def convert_lead(lead, user=None) -> dict:
             customer_id = result.get("customer_id")
 
         except Exception as e:
-            logger.exception(f"Error in onboarding callback for lead {lead.id}")
+            logger.exception(f"Error in onboarding callback for prospective client {prospective_client.id}")
             return {
                 "success": False,
                 "error": f"Callback error: {str(e)}",
             }
 
-    # Mark lead as converted
-    lead.status = Lead.Status.WON
-    lead.converted_at = timezone.now()
+    # Mark prospective client as converted
+    prospective_client.status = ProspectiveClient.Status.WON
+    prospective_client.converted_at = timezone.now()
     if customer_id:
-        lead.converted_to_id = customer_id
-    lead.save(update_fields=["status", "converted_at", "converted_to_id", "updated_at"])
+        prospective_client.converted_to_id = customer_id
+    prospective_client.save(update_fields=["status", "converted_at", "converted_to_id", "updated_at"])
 
-    logger.info(f"Lead {lead.id} ({lead.company_name}) converted to customer {customer_id}")
+    logger.info(f"Prospective client {prospective_client.id} ({prospective_client.company_name}) converted to customer {customer_id}")
 
     return {
         "success": True,
         "customer_id": customer_id,
-        "lead_id": lead.id,
+        "prospective_client_id": prospective_client.id,
     }
 
 
-def prepare_onboarding_data(lead) -> dict:
+def prepare_onboarding_data(prospective_client) -> dict:
     """
-    Prepare lead data for onboarding/handoff.
+    Prepare prospective client data for onboarding/handoff.
 
-    Returns a dictionary with all lead data formatted for
+    Returns a dictionary with all prospective client data formatted for
     customer creation in the consuming project.
 
     Args:
-        lead: The Lead instance
+        prospective_client: The ProspectiveClient instance
 
     Returns:
-        dict with lead data ready for customer creation
+        dict with prospective client data ready for customer creation
     """
     # Get primary contact
-    primary_contact = lead.contacts.filter(is_primary=True).first()
+    primary_contact = prospective_client.contacts.filter(is_primary=True).first()
     if not primary_contact:
-        primary_contact = lead.contacts.first()
+        primary_contact = prospective_client.contacts.first()
 
     data = {
         "company": {
-            "name": lead.company_name,
-            "industry": lead.industry,
-            "website": lead.website,
+            "name": prospective_client.company_name,
+            "industry": prospective_client.industry.name if prospective_client.industry else None,
+            "website": prospective_client.website,
             "address": {
-                "line1": lead.address_line1,
-                "line2": lead.address_line2,
-                "city": lead.city,
-                "state": lead.state,
-                "postal_code": lead.postal_code,
-                "country": lead.country,
+                "line1": prospective_client.address_line1,
+                "line2": prospective_client.address_line2,
+                "city": prospective_client.city,
+                "state": prospective_client.state,
+                "postal_code": prospective_client.postal_code,
+                "country": prospective_client.country,
             },
         },
-        "primary_email": lead.email,
-        "primary_phone": lead.phone,
-        "estimated_value": float(lead.estimated_value) if lead.estimated_value else None,
-        "source": lead.source,
-        "notes": lead.notes,
-        "lead_uuid": str(lead.uuid),
+        "primary_email": primary_contact.email if primary_contact else None,
+        "primary_phone": primary_contact.phone if primary_contact else None,
+        "estimated_value": float(prospective_client.estimated_value) if prospective_client.estimated_value else None,
+        "source": prospective_client.source,
+        "notes": prospective_client.notes,
+        "prospective_client_uuid": str(prospective_client.uuid),
     }
 
     # Add primary contact if exists
@@ -135,8 +135,8 @@ def prepare_onboarding_data(lead) -> dict:
             "first_name": primary_contact.first_name,
             "last_name": primary_contact.last_name,
             "title": primary_contact.title,
-            "email": primary_contact.email or lead.email,
-            "phone": primary_contact.phone or lead.phone,
+            "email": primary_contact.email,
+            "phone": primary_contact.phone,
             "phone_mobile": primary_contact.phone_mobile,
         }
 
@@ -153,7 +153,7 @@ def prepare_onboarding_data(lead) -> dict:
             "is_primary": c.is_primary,
             "preferred_contact_method": c.preferred_contact_method,
         }
-        for c in lead.contacts.all()
+        for c in prospective_client.contacts.all()
     ]
 
     return data
